@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rural AI Medical Helpline | Telephony & Analytics Dashboard</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22><text y=%2226%22 font-size=%2226%22>📞</text></svg>">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <div class="logo-badge">📞 MedLine</div>
+        <div class="title-group">
+          <h1>Multilingual AI Medical Helpline</h1>
+          <p>Autonomous Voice & Keypad Triage for Rural Feature Phones • English | हिन्दी | मराठी</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-seed-demo" class="btn btn-outline" title="Populate synthetic interactions for presentation">Seed Demo Data (50)</button>
+        <button id="btn-export-csv" class="btn btn-primary" title="Export anonymous dataset to CSV">Export CSV</button>
+      </div>
+    </header>
+
+    <!-- Medical Disclaimer Banner -->
+    <div class="disclaimer-banner">
+      <span>⚠️</span>
+      <div>
+        <strong>CLINICAL SAFETY NOTICE:</strong> This prototype provides structured heuristic triage guidance for rural telephony helplines. It is not a substitute for a qualified medical professional, does not prescribe medication, and must be reviewed by licensed clinicians before deployment.
+      </div>
+    </div>
+
+    <!-- Main Grid Layout -->
+    <div class="grid-layout">
+      <!-- Left Column: Analytics & Reports -->
+      <section class="dashboard-main">
+        <!-- KPI Summary Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-label">Total Interactions</span>
+            <span id="kpi-total" class="kpi-value">0</span>
+            <span id="synthetic-count-badge" class="kpi-sub">0 demo / 0 live</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Emergency Alerts</span>
+            <span id="kpi-emergency" class="kpi-value" style="color:var(--accent-red);">0</span>
+            <span class="kpi-sub">Immediate 108 referral</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Clinic Referrals</span>
+            <span id="kpi-referrals" class="kpi-value">0%</span>
+            <span id="kpi-referrals-sub" class="kpi-sub">0 referrals recommended</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Completion Rate</span>
+            <span id="kpi-completion" class="kpi-value">0%</span>
+            <span id="kpi-completion-sub" class="kpi-sub">0 completed / 0 dropped</span>
+          </div>
+        </div>
+
+        <!-- Filter Toolbar -->
+        <div class="filter-toolbar">
+          <div class="filter-group">
+            <label for="filter-synthetic">Data View:</label>
+            <select id="filter-synthetic" class="form-select">
+              <option value="all">All Records (Demo + Live)</option>
+              <option value="live_only">Live Calls Only</option>
+              <option value="synthetic_only">Synthetic Demo Only</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="filter-start-date">From:</label>
+            <input type="date" id="filter-start-date" class="form-input">
+          </div>
+          <div class="filter-group">
+            <label for="filter-end-date">To:</label>
+            <input type="date" id="filter-end-date" class="form-input">
+          </div>
+          <button id="btn-apply-filters" class="btn btn-outline" style="padding:0.4rem 0.8rem;">Apply</button>
+        </div>
+
+        <!-- Visual Analytics Cards -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+          <!-- Languages Breakdown -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">🌐 Language Breakdown</span>
+            </div>
+            <div id="chart-languages">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Urgency Categories -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">🩺 Triage Urgency</span>
+            </div>
+            <div id="chart-urgency">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Symptom Categories -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">📊 Top Symptom Categories</span>
+            </div>
+            <div id="chart-symptoms">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Anonymous Reports Log Table -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📋 Anonymous Call Reports (Zero PII)</span>
+            <span style="font-size:0.8rem;color:var(--text-muted);">Names, Phone Numbers & Transcripts Excluded</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Session ID</th>
+                  <th>Source</th>
+                  <th>Language</th>
+                  <th>Symptom Category</th>
+                  <th>Urgency Tier</th>
+                  <th>Referral?</th>
+                  <th>Timestamp (Min-rounded)</th>
+                </tr>
+              </thead>
+              <tbody id="reports-tbody">
+                <tr>
+                  <td colspan="7" style="text-align:center;color:var(--text-muted);">Loading records...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Interactive Rural Feature Phone Simulator -->
+      <aside class="phone-simulator-container">
+        <div class="feature-phone">
+          <div class="browser-sim-tag">[ Browser Simulation • Not a Real Telephone Connection ]</div>
+          <div class="phone-earpiece"></div>
+
+          <!-- Retro Phone LCD Display -->
+          <div class="phone-screen">
+            <div id="phone-screen-header" class="screen-header">
+              <span>4G VoLTE [EN]</span>
+              <span>10:30 AM</span>
+            </div>
+            <div id="phone-screen-content" class="screen-content">
+Press the green CALL button below to simulate an incoming call to the rural medical helpline.
+            </div>
+            <div>
+              <span id="phone-screen-status" class="screen-status-pill badge-general">OFFLINE</span>
+            </div>
+          </div>
+
+          <!-- Call Action Keys -->
+          <div class="phone-nav-controls">
+            <button id="phone-call-btn" class="nav-key call-key" title="Dial Helpline">CALL</button>
+            <button class="nav-key" onclick="window.phoneSimulator?.handleDigitPress('0')" title="Repeat">REPEAT (0)</button>
+            <button id="phone-end-btn" class="nav-key end-key" title="Hangup">END (9)</button>
+          </div>
+
+          <!-- Feature Phone Tactile 3x4 Keypad -->
+          <div class="phone-keypad">
+            <button class="keypad-btn" data-digit="1">
+              <span class="digit">1</span>
+              <span class="subtext">EN (English)</span>
+            </button>
+            <button class="keypad-btn" data-digit="2">
+              <span class="digit">2</span>
+              <span class="subtext">HI (हिंदी)</span>
+            </button>
+            <button class="keypad-btn" data-digit="3">
+              <span class="digit">3</span>
+              <span class="subtext">MR (मराठी)</span>
+            </button>
+
+            <button class="keypad-btn" data-digit="4">
+              <span class="digit">4</span>
+              <span class="subtext">GHI</span>
+            </button>
+            <button class="keypad-btn" data-digit="5">
+              <span class="digit">5</span>
+              <span class="subtext">JKL</span>
+            </button>
+            <button class="keypad-btn" data-digit="6">
+              <span class="digit">6</span>
+              <span class="subtext">MNO</span>
+            </button>
+
+            <button class="keypad-btn" data-digit="7">
+              <span class="digit">7</span>
+              <span class="subtext">PQRS</span>
+            </button>
+            <button class="keypad-btn" data-digit="8">
+              <span class="digit">8</span>
+              <span class="subtext">TUV</span>
+            </button>
+            <button class="keypad-btn" data-digit="9">
+              <span class="digit">9</span>
+              <span class="subtext">WXYZ [EXIT]</span>
+            </button>
+
+            <button class="keypad-btn" data-digit="*">
+              <span class="digit">*</span>
+              <span class="subtext">RESET</span>
+            </button>
+            <button class="keypad-btn" data-digit="0">
+              <span class="digit">0</span>
+              <span class="subtext">REPEAT</span>
+            </button>
+            <button class="keypad-btn" data-digit="#">
+              <span class="digit">#</span>
+              <span class="subtext">ENTER</span>
+            </button>
+          </div>
+
+          <!-- Spoken Speech Simulator -->
+          <div class="speech-sim-box">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;">Simulate Caller Speech:</label>
+              <span id="mic-status-indicator" style="font-size:0.7rem;color:var(--text-muted);">Mic: Ready</span>
+            </div>
+            <div style="display:flex;gap:0.4rem;">
+              <input type="text" id="phone-symptom-text" placeholder="Speak symptoms or type here..." style="flex-grow:1;">
+              <button id="phone-send-symptom" class="btn btn-primary" style="padding:0.4rem 0.75rem;" title="Speak symptoms using microphone">🎙️ Speak</button>
+              <button id="phone-send-text" class="btn btn-outline" style="padding:0.4rem 0.75rem;" title="Send typed text directly">Send</button>
+            </div>
+            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.25rem;">
+              Tip: Click <strong>🎙️ Speak</strong> to dictate in English, Hindi, or Marathi, or type and click <strong>Send</strong>.
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="/static/js/simulator.js"></script>
+  <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

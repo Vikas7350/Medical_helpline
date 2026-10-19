@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: swassetu-helpline
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: TELEPHONY_PROVIDER
+        value: exotel
+      - key: STT_PROVIDER
+        value: speech_recognition
+      - key: TTS_PROVIDER
+        value: edge_tts
+      - key: LLM_PROVIDER
+        value: grok
+      - key: EXOTEL_STREAM_REQUIRE_AUTH
+        value: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: swassetu-db
+          property: connectionString
+
+databases:
+  - name: swassetu-db
+    databaseName: swassetu
+    user: swassetu_user
+    plan: free
