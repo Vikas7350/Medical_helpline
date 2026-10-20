@@ -5,6 +5,13 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 from app.engine.localization import WELCOME_IVR_MENU, get_prompt
+from app.engine.parsers import (
+    is_exit_command,
+    is_repeat_command,
+    parse_duration,
+    parse_severity,
+    parse_yes_no,
+)
 from app.triage.engine import TriageAssessment, TriageEngine
 
 
@@ -62,7 +69,7 @@ class HelplineStateMachine:
         caller_input = (caller_input or "").strip()
 
         # Global command: DTMF 9 or speech "goodbye/exit" ends the call
-        if caller_input in ("9", "exit", "quit", "goodbye", "नमस्ते", "नमस्कार"):
+        if is_exit_command(caller_input):
             lang = context.language or "en"
             context.state = ConversationState.COMPLETED
             context.is_completed = True
@@ -78,7 +85,7 @@ class HelplineStateMachine:
             )
 
         # Global command: DTMF 0 repeats the last spoken prompt
-        if caller_input in ("0", "repeat", "दोहराएं", "पुन्हा सांगा"):
+        if is_repeat_command(caller_input):
             lang = context.language or "en"
             return TurnResult(
                 next_state=context.state,
@@ -254,15 +261,35 @@ class HelplineStateMachine:
     def _handle_duration_input(cls, context: ConversationContext, user_input: str) -> TurnResult:
         """Parse symptom duration and proceed to severity question."""
         lang = context.language or "en"
+
+        duration_days = parse_duration(user_input, language=lang)
+        if duration_days is None:
+            context.unrecognized_count += 1
+            if context.unrecognized_count >= 3:
+                context.state = ConversationState.COMPLETED
+                context.is_completed = False
+                return TurnResult(
+                    next_state=ConversationState.COMPLETED,
+                    spoken_text=get_prompt("max_retries", lang),
+                    language=lang,
+                    is_completed=False,
+                    should_hangup=True,
+                    requires_dtmf=False,
+                    triage_assessment=context.triage_assessment,
+                )
+            clarification_text = f"{get_prompt('unrecognized', lang)} {context.last_spoken_prompt}"
+            return TurnResult(
+                next_state=ConversationState.DURATION_INPUT,
+                spoken_text=clarification_text,
+                language=lang,
+                is_completed=False,
+                should_hangup=False,
+                requires_dtmf=False,
+                triage_assessment=context.triage_assessment,
+            )
+
+        # Valid duration recognized
         context.unrecognized_count = 0
-
-        # Parse duration (e.g. "1" = <3 days, "2" = >=3 days, or explicit numbers)
-        duration_days = 1
-        if "2" in user_input or "more" in user_input.lower() or "ज्यादा" in user_input or "जास्त" in user_input:
-            duration_days = 4
-        elif any(w in user_input for w in ["3", "4", "5", "6", "7", "week", "हफ्ते", "आठवडा"]):
-            duration_days = 4
-
         context.duration_days = duration_days
 
         context.state = ConversationState.SEVERITY_INPUT
@@ -281,17 +308,37 @@ class HelplineStateMachine:
 
     @classmethod
     def _handle_severity_input(cls, context: ConversationContext, user_input: str) -> TurnResult:
-        """Parse severity and check emergency signs."""
+        """Parse severity and deliver triage guidance."""
         lang = context.language or "en"
+
+        severity = parse_severity(user_input, language=lang)
+        if severity is None:
+            context.unrecognized_count += 1
+            if context.unrecognized_count >= 3:
+                context.state = ConversationState.COMPLETED
+                context.is_completed = False
+                return TurnResult(
+                    next_state=ConversationState.COMPLETED,
+                    spoken_text=get_prompt("max_retries", lang),
+                    language=lang,
+                    is_completed=False,
+                    should_hangup=True,
+                    requires_dtmf=False,
+                    triage_assessment=context.triage_assessment,
+                )
+            clarification_text = f"{get_prompt('unrecognized', lang)} {context.last_spoken_prompt}"
+            return TurnResult(
+                next_state=ConversationState.SEVERITY_INPUT,
+                spoken_text=clarification_text,
+                language=lang,
+                is_completed=False,
+                should_hangup=False,
+                requires_dtmf=False,
+                triage_assessment=context.triage_assessment,
+            )
+
+        # Valid severity recognized
         context.unrecognized_count = 0
-
-        # Parse severity
-        severity = 2  # Default moderate
-        if "1" in user_input or "mild" in user_input.lower() or "हल्का" in user_input or "हलका" in user_input:
-            severity = 1
-        elif "3" in user_input or "severe" in user_input.lower() or "तेज" in user_input or "तीव्र" in user_input:
-            severity = 8
-
         context.severity_level = severity
 
         # Re-evaluate triage with duration and severity incorporated
@@ -323,7 +370,37 @@ class HelplineStateMachine:
     def _handle_emergency_confirmation(cls, context: ConversationContext, user_input: str) -> TurnResult:
         """Handle explicit check for emergency red flags."""
         lang = context.language or "en"
-        if "1" in user_input or "yes" in user_input.lower() or "हाँ" in user_input or "होय" in user_input:
+
+        is_yes = parse_yes_no(user_input, language=lang)
+        if is_yes is None:
+            context.unrecognized_count += 1
+            if context.unrecognized_count >= 3:
+                context.state = ConversationState.COMPLETED
+                context.is_completed = False
+                return TurnResult(
+                    next_state=ConversationState.COMPLETED,
+                    spoken_text=get_prompt("max_retries", lang),
+                    language=lang,
+                    is_completed=False,
+                    should_hangup=True,
+                    requires_dtmf=False,
+                    triage_assessment=context.triage_assessment,
+                )
+            clarification_text = f"{get_prompt('unrecognized', lang)} {context.last_spoken_prompt}"
+            return TurnResult(
+                next_state=ConversationState.EMERGENCY_CONFIRMATION,
+                spoken_text=clarification_text,
+                language=lang,
+                is_completed=False,
+                should_hangup=False,
+                requires_dtmf=False,
+                triage_assessment=context.triage_assessment,
+            )
+
+        context.unrecognized_count = 0
+        context.emergency_confirmed = is_yes
+
+        if is_yes:
             # Caller confirmed emergency signs
             assessment = TriageEngine.evaluate("chest pain severe breathing problem", language=lang)
             context.triage_assessment = assessment

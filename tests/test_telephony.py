@@ -1123,3 +1123,96 @@ def test_websocket_disconnect_during_utterance_handling(client):
         ws.close()
 
 
+def test_websocket_spoken_duration_advances_to_severity(client):
+    """Verify incoming speech during DURATION_INPUT advances state machine over WebSocket stream."""
+    from app.engine.conversation import conversation_manager
+    from app.engine.state_machine import ConversationState
+
+    with client.websocket_connect("/api/v1/telephony/stream") as ws:
+        ws.send_text(json.dumps({"event": "connected"}))
+        ws.send_text(json.dumps({
+            "event": "start",
+            "stream_sid": "duration-speech-stream",
+            "start": {
+                "call_sid": "CALL_DURATION_SPEECH_ADVANCE",
+                "stream_sid": "duration-speech-stream",
+                "media_format": {"sample_rate": "8000"},
+            },
+        }))
+
+        # Drain greeting
+        while True:
+            m = json.loads(ws.receive_text())
+            if m.get("event") == "mark":
+                break
+
+        # Select Hindi with DTMF 2
+        ws.send_text(json.dumps({
+            "event": "dtmf",
+            "stream_sid": "duration-speech-stream",
+            "dtmf": {"digit": "2"},
+        }))
+
+        clear_msg = json.loads(ws.receive_text())
+        assert clear_msg["event"] == "clear"
+
+        # Drain Hindi prompt
+        while True:
+            m = json.loads(ws.receive_text())
+            if m.get("event") == "mark":
+                break
+
+        ctx = conversation_manager.get_context("CALL_DURATION_SPEECH_ADVANCE")
+        assert ctx.state == ConversationState.SYMPTOM_INPUT
+        assert ctx.language == "hi"
+
+        # 1. Caller speaks symptom
+        speech_b64 = base64.b64encode(b"\x20\x10" * 1600).decode("ascii")
+        silence_b64 = base64.b64encode(b"\x00" * 3200).decode("ascii")
+
+        for i in range(3):
+            ws.send_text(json.dumps({
+                "event": "media",
+                "stream_sid": "duration-speech-stream",
+                "media": {"chunk": i + 1, "payload": speech_b64},
+            }))
+        for i in range(5):
+            ws.send_text(json.dumps({
+                "event": "media",
+                "stream_sid": "duration-speech-stream",
+                "media": {"chunk": 4 + i, "payload": silence_b64},
+            }))
+
+        # Drain response to symptom input
+        while True:
+            m = json.loads(ws.receive_text())
+            if m.get("event") == "mark":
+                break
+
+        assert ctx.state == ConversationState.DURATION_INPUT
+
+        # 2. Caller speaks duration: MockSTT in Hindi returns "मुझे तीन दिन से तेज बुखार है" which has "तीन दिन" (3 days)
+        for i in range(3):
+            ws.send_text(json.dumps({
+                "event": "media",
+                "stream_sid": "duration-speech-stream",
+                "media": {"chunk": 10 + i, "payload": speech_b64},
+            }))
+        for i in range(5):
+            ws.send_text(json.dumps({
+                "event": "media",
+                "stream_sid": "duration-speech-stream",
+                "media": {"chunk": 13 + i, "payload": silence_b64},
+            }))
+
+        # Drain response to duration input
+        while True:
+            m = json.loads(ws.receive_text())
+            if m.get("event") == "mark":
+                break
+
+        assert ctx.state == ConversationState.SEVERITY_INPUT
+        assert ctx.duration_days == 3
+
+
+
